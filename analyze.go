@@ -66,6 +66,11 @@ func Analyze(fileName string, opts *AnalyzeOpts, readOpts *ReadOpts) error {
 	if err != nil {
 		return err
 	}
+	if rOpts.InTypeInfer {
+		// Analyze must report the same types a real import would declare, or
+		// the suggestion would disagree with what `trdsql -itype` actually does.
+		reader = newInferReader(reader)
+	}
 	columnNames, err := reader.Names()
 	if err != nil {
 		return err

@@ -58,6 +58,7 @@ For usage as a library, please refer to the [godoc](https://pkg.go.dev/github.co
   * 4.17. [Raw output](#raw-output)
   * 4.18. [ASCII Table & MarkDown output](#ascii-table-&-markdown-output)
   * 4.19. [Vertical format output](#vertical-format-output)
+  * 4.20. [Type inference](#type-inference)
 * 5. [SQL](#sql)
   * 5.1. [SQL function](#sql-function)
   * 5.2. [JOIN](#join)
@@ -202,6 +203,7 @@ trdsql -o[output format] -t [input filename]
 * `-inum` add row number column.
 * `-ir` **int** number of rows to preread. (default 1)
 * `-is` **int** skip header row.
+* `-itype` infer column types and promote them explicitly (integer -> numeric -> text).
 
 ###  3.3. <a name='output-formats'></a>Output formats
 
@@ -935,6 +937,72 @@ $ trdsql -ovf "SELECT * FROM test.csv"
   c1 | 3
   c2 | Apple
 ```
+
+###  4.20. <a name='type-inference'></a>Type inference
+
+By default every column of a delimited file is declared as `text` and values are
+imported as-is. The `-itype` option infers a column type from the preread rows
+(`-ir`) and declares it in the table:
+
+```console
+$ cat test.csv
+id,qc
+1,10
+2,20
+3,30.5
+$ trdsql -icsv -ih -ir 3 -itype -otbln "SELECT * FROM test.csv"
+; name: | id | qc |
+; type: | int | numeric |
+| 1 | 10 |
+| 2 | 20 |
+| 3 | 30.5 |
+```
+
+The inferred types follow a fixed widening order:
+
+```
+unknown (empty/NULL) -> integer -> numeric -> text
+```
+
+A column only ever moves to the right. Leading-zero values such as `007` are
+treated as text, so identifiers and fixed-width ids keep their zeros. An empty
+field in an integer or numeric column becomes `NULL`.
+
+A type is decided from the preread rows, but the whole file is imported. When a
+later value does not fit the declared type, the column is **promoted** and the
+table is rebuilt inside the same transaction:
+
+```console
+$ trdsql -icsv -ih -itype "SELECT * FROM qc.csv"
+trdsql: column `qc` promoted integer -> numeric (earlier rows preserved)
+1,10
+2,20
+3,30.5
+```
+
+The promotion line is written to standard error; the rows are the query result.
+Earlier rows are carried over to the widened column, and the table ends up with
+a declaration that matches the data. The promotion is explicit: it is reported
+on stderr and the exported type is the final declared one (`numeric` above,
+shown in `-otbln`). trdsql never relies on the database driver or on SQLite
+type affinity to coerce a value into the wrong declared type.
+
+| driver     | integer | numeric        |
+|------------|---------|----------------|
+| SQLite     | integer | numeric        |
+| MySQL      | bigint  | decimal(65,30) |
+| PostgreSQL | bigint  | numeric        |
+
+To widen the preread window (and so decide more types before importing), raise
+`-ir`:
+
+```console
+$ trdsql -icsv -ih -ir 1000 -itype "SELECT * FROM big.csv"
+```
+
+A TBLN definition header is authoritative: with `-itype`, its declared types
+are kept rather than inferred again. Types outside the family above (for
+example `date`) are passed through and never promoted.
 
 ##  5. <a name='sql'></a>SQL
 

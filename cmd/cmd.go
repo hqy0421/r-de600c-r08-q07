@@ -83,6 +83,7 @@ func (cli Cli) Run(args []string) int {
 		inLimitRead int
 		inNull      nilString
 		inRowNumber bool
+		inTypeInfer bool
 
 		outFlag         outputFlag
 		outFile         string
@@ -125,6 +126,7 @@ func (cli Cli) Run(args []string) int {
 	flags.StringVar(&inJQuery, "ijq", "", "jq expression string for input(JSON/JSONL only).")
 	flags.Var(&inNull, "inull", "value(string) to convert to null on input.")
 	flags.BoolVar(&inRowNumber, "inum", false, "add row number column.")
+	flags.BoolVar(&inTypeInfer, "itype", false, "infer column types and promote them explicitly (integer -> numeric -> text).")
 
 	flags.BoolVar(&inFlag.CSV, "icsv", false, "CSV format for input.")
 	flags.BoolVar(&inFlag.LTSV, "iltsv", false, "LTSV format for input.")
@@ -208,6 +210,7 @@ func (cli Cli) Run(args []string) int {
 			trdsql.InSkip(inSkip),
 			trdsql.InPreRead(inPreRead),
 			trdsql.InJQ(inJQuery),
+			trdsql.InTypeInfer(inTypeInfer),
 		)
 		if err = trdsql.Analyze(analyze, opts, readOpts); err != nil {
 			log.Printf("ERROR: %s", err)
@@ -252,6 +255,7 @@ func (cli Cli) Run(args []string) int {
 		trdsql.InNeedNULL(inNull.valid),
 		trdsql.InNULL(inNull.str),
 		trdsql.InRowNumber(inRowNumber),
+		trdsql.InTypeInfer(inTypeInfer),
 	)
 
 	writer := cli.OutStream

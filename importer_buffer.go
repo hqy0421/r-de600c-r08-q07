@@ -9,6 +9,7 @@ import (
 type BufferImporter struct {
 	Reader
 	tableName string
+	typed     bool
 }
 
 // NewBufferImporter returns a BufferImporter.
@@ -19,9 +20,13 @@ func NewBufferImporter(tableName string, r io.Reader, options ...ReadOpt) (*Buff
 	if err != nil {
 		return nil, err
 	}
+	if readOpts.InTypeInfer {
+		reader = newInferReader(reader)
+	}
 	return &BufferImporter{
 		tableName: tableName,
 		Reader:    reader,
+		typed:     readOpts.InTypeInfer,
 	}, nil
 }
 
@@ -41,8 +46,15 @@ func (i *BufferImporter) ImportContext(ctx context.Context, db *DB, query string
 	if err != nil {
 		return query, err
 	}
-	if err := db.CreateTable(i.tableName, names, types, true); err != nil {
+	createTypes := types
+	if i.typed {
+		createTypes = db.portableTypes(types)
+	}
+	if err := db.CreateTable(i.tableName, names, createTypes, true); err != nil {
 		return query, err
+	}
+	if i.typed {
+		return query, db.ImportTypedContext(ctx, i.tableName, names, types, true, i.Reader)
 	}
 	return query, db.ImportContext(ctx, i.tableName, names, i.Reader)
 }

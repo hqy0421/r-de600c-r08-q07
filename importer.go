@@ -261,6 +261,10 @@ func ImportFileContext(ctx context.Context, db *DB, fileName string, readOpts *R
 		reader = newRowNumberReader(reader)
 	}
 
+	if opts.InTypeInfer {
+		reader = newInferReader(reader)
+	}
+
 	columnNames, err := reader.Names()
 	if err != nil {
 		if !errors.Is(err, io.EOF) {
@@ -278,10 +282,20 @@ func ImportFileContext(ctx context.Context, db *DB, fileName string, readOpts *R
 	debug.Printf("Column Names: [%v]", strings.Join(columnNames, ","))
 	debug.Printf("Column Types: [%v]", strings.Join(columnTypes, ","))
 
-	if err := db.CreateTableContext(ctx, tableName, columnNames, columnTypes, opts.IsTemporary); err != nil {
+	createTypes := columnTypes
+	if opts.InTypeInfer {
+		// Inference speaks portable names (integer/numeric/text); the DB layer
+		// widens them to the target driver's real storage types so that a
+		// promoted column is not silently truncated or overflowed.
+		createTypes = db.portableTypes(columnTypes)
+	}
+	if err := db.CreateTableContext(ctx, tableName, columnNames, createTypes, opts.IsTemporary); err != nil {
 		return tableName, err
 	}
 
+	if opts.InTypeInfer {
+		return tableName, db.ImportTypedContext(ctx, tableName, columnNames, columnTypes, opts.IsTemporary, reader)
+	}
 	return tableName, db.ImportContext(ctx, tableName, columnNames, reader)
 }
 

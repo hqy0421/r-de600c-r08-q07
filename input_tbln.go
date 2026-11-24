@@ -97,6 +97,12 @@ func (r *TBLNRead) Types() ([]string, error) {
 	return d.Types(), nil
 }
 
+// DeclaresTypes reports that a TBLN definition header is authoritative:
+// type inference keeps the declared types instead of inferring them again.
+func (r *TBLNRead) DeclaresTypes() bool {
+	return true
+}
+
 // PreReadRow returns only columns that store preread rows.
 func (r *TBLNRead) PreReadRow() [][]any {
 	return r.preRead

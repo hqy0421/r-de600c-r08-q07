@@ -42,6 +42,8 @@ type DB struct {
 	Tx *sql.Tx
 	// importCount represents the number that is incremented to identify imported files.
 	importCount int
+	// promotions records the column type widenings applied during typed import.
+	promotions []Promotion
 }
 
 // Disconnect disconnects the database.
@@ -104,6 +106,15 @@ type importTable struct {
 	maxCap    int
 	lastCount int
 	count     int
+
+	// columnTypes are the declared column types, in the same order as columns.
+	// They are only maintained by the typed import (ImportTypedContext).
+	columnTypes []string
+	// isTemporary is the table's temporary flag, used when rebuilding it.
+	isTemporary bool
+	// rebuilds counts how many times the table has been rebuilt so that the
+	// scratch table name stays unique within the transaction.
+	rebuilds int
 }
 
 // Import imports data into a table.

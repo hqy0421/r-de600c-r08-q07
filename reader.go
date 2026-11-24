@@ -127,6 +127,11 @@ type ReadOpts struct {
 
 	// InRowNumber indicates whether to add a row number column.
 	InRowNumber bool
+
+	// InTypeInfer enables column type inference and explicit promotion.
+	// When it is false (the default) every text column of a delimited file is
+	// declared as text and values are imported as-is.
+	InTypeInfer bool
 }
 
 // NewReadOpts returns a ReadOpts.
@@ -224,6 +229,14 @@ func IsTemporary(t bool) ReadOpt {
 func InRowNumber(t bool) ReadOpt {
 	return func(args *ReadOpts) {
 		args.InRowNumber = t
+	}
+}
+
+// InTypeInfer enables column type inference and explicit promotion.
+// It is off by default: without it, delimited files keep every column as text.
+func InTypeInfer(t bool) ReadOpt {
+	return func(args *ReadOpts) {
+		args.InTypeInfer = t
 	}
 }
 
